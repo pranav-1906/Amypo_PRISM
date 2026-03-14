@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <title>PRISM | Student IDE Workspace V2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'amypo-green': '#2b8a44',
+                        'ide-bg': '#1e1e1e',
+                        'ide-surface': '#252526',
+                        'ide-border': '#333333',
+                        'ide-text': '#d4d4d4',
+                        'ide-accent': '#007acc',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; border: 2px solid #1e1e1e; }
+        .results-scroll::-webkit-scrollbar-track { background: #f8fafc; }
+        .results-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border: 2px solid #f8fafc; }
+        
+        .editor-container { position: relative; display: flex; height: 100%; overflow: hidden; background-color: #1e1e1e; }
+        .line-numbers { width: 40px; padding: 16px 0; background-color: #1e1e1e; color: #858585; text-align: right; font-family: 'Fira Code', monospace; font-size: 13px; line-height: 21px; overflow: hidden; border-right: 1px solid #333; user-select: none; }
+        .line-numbers span { display: block; padding-right: 10px; }
+        .code-input { flex-grow: 1; background-color: transparent; color: #d4d4d4; font-family: 'Fira Code', monospace; font-size: 13px; line-height: 21px; padding: 16px; border: none; resize: none; outline: none; white-space: pre; overflow-wrap: normal; overflow-x: auto; tab-size: 4; }
+        .code-input::selection { background-color: #264f78; }
+        
+        .hidden-pane { display: none !important; }
+        .bg-checkerboard { background-color: #f0f0f0; background-image: linear-gradient(45deg, #e0e0e0 25%, transparent 25%), linear-gradient(-45deg, #e0e0e0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e0e0e0 75%), linear-gradient(-45deg, transparent 75%, #e0e0e0 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+
+        /* Anti-Cheat Toast Animation */
+        @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast-enter { animation: slideDown 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-[#0d0d0d] h-screen w-full flex flex-col font-sans overflow-hidden text-gray-200">
+
+    <div id="cheat-warning" class="hidden-pane fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-600 text-white px-6 py-3 rounded-lg shadow-2xl font-bold flex items-center border-2 border-red-800">
+        <i class="fa-solid fa-triangle-exclamation text-2xl mr-3 text-yellow-300"></i>
+        <div>
+            <div class="text-sm">Tab Switch Detected!</div>
+            <div class="text-xs font-normal opacity-90">Your activity has been logged. Do not leave this screen during an evaluation.</div>
+        </div>
+    </div>
+    <div id="strike-modal" class="hidden-pane fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
+        <div class="bg-red-600 border-4 border-red-800 rounded-xl p-8 max-w-md text-center text-white shadow-[0_0_50px_rgba(220,38,38,0.5)]">
+            <i class="fa-solid fa-hand text-6xl mb-4 text-white"></i>
+            <h2 class="text-3xl font-black uppercase tracking-widest mb-2">Warning</h2>
+            <p class="text-lg font-bold mb-4" id="strike-message">You have left the active exam window.</p>
+            <div class="bg-red-900 text-red-200 py-2 px-4 rounded font-mono font-bold mb-6 text-sm">
+                Strike <span id="strike-count-display" class="text-white text-lg">1</span> of 3
+            </div>
+            <p class="text-sm mb-6 opacity-80">Further violations will result in automatic submission and an evaluation score of 0.</p>
+            <button onclick="resumeExam()" class="bg-white text-red-700 font-bold py-3 px-8 rounded hover:bg-gray-200 transition-colors w-full">I Understand. Return to Exam.</button>
+        </div>
+    </div>
+
+    <nav class="bg-ide-surface border-b border-ide-border h-14 flex items-center justify-between px-4 flex-shrink-0 z-20 shadow-md">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center">
+                <img src="static/logo.png" alt="PRISM Logo" class="h-8 w-auto mr-3">
+                <span class="font-extrabold text-lg text-white tracking-tight">PRISM <span class="text-[10px] text-purple-400 align-top">v2</span></span>
+            </div>
+            
+            <div class="ml-4 pl-4 border-l border-ide-border flex items-center">
+                <div class="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-bold mr-2">{{ name[0] }}</div>
+                <div>
+                    <div class="text-xs font-bold text-gray-200">{{ name }}</div>
+                    <div class="text-[10px] text-gray-400 font-mono">{{ reg_num }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 bg-[#1e1e1e] p-1.5 rounded-lg border border-ide-border">
+            <i class="fa-solid fa-hashtag text-purple-500 text-xs ml-2"></i>
+            <input type="text" id="input-task-id" class="bg-transparent border-none text-xs text-purple-300 outline-none w-32 font-mono placeholder-gray-600" placeholder="Enter Task ID...">
+            <button onclick="loadTask()" id="btn-load-task" class="bg-gray-700 hover:bg-gray-600 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors">Load</button>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div id="exam-timer-container" class="hidden-pane flex items-center bg-gray-900 border border-gray-700 px-3 py-1.5 rounded text-red-400 font-mono font-bold shadow-inner">
+                <i class="fa-regular fa-clock mr-2"></i>
+                <span id="exam-timer">00:00</span>
+            </div>
+
+            <button onclick="submitEvaluation()" id="btn-submit" disabled class="bg-gray-700 text-gray-400 cursor-not-allowed text-sm font-bold px-5 py-1.5 rounded shadow-[0_0_10px_rgba(0,0,0,0.3)] transition-all flex items-center">
+                <i class="fa-solid fa-play text-xs mr-2"></i> Run Evaluation
+            </button>
+            <a href="/api/logout" class="text-gray-400 hover:text-red-400 ml-2" title="Logout"><i class="fa-solid fa-power-off"></i></a>
+        </div>
+    </nav>
+
+    <main class="flex-1 flex overflow-hidden">
+        
+        <div class="w-12 bg-ide-surface border-r border-ide-border flex flex-col items-center py-4 gap-4 flex-shrink-0 z-10">
+            <button onclick="switchWorkspaceMode('editor')" id="nav-editor" class="text-white relative group">
+                <i class="fa-regular fa-file-code text-xl"></i>
+                <div id="indicator-editor" class="absolute -left-3 top-0 bottom-0 w-0.5 bg-ide-accent"></div>
+            </button>
+        </div>
+
+        <section class="w-1/2 flex flex-col border-r border-ide-border bg-ide-bg relative">
+            
+            <div id="workspace-editor" class="flex flex-col h-[60%] border-b border-ide-border relative">
+                <div class="flex bg-ide-surface border-b border-ide-border overflow-x-auto justify-between items-center pr-2">
+                    <div class="flex">
+                        <button onclick="switchFile('html')" id="tab-html" class="px-4 py-2 text-sm font-mono text-white bg-ide-bg border-t-2 border-ide-accent flex items-center"><i class="fa-brands fa-html5 text-orange-500 mr-2"></i>index.html</button>
+                        <button onclick="switchFile('css')" id="tab-css" class="px-4 py-2 text-sm font-mono text-gray-400 bg-transparent hover:bg-gray-800 border-t-2 border-transparent flex items-center"><i class="fa-brands fa-css3-alt text-blue-400 mr-2"></i>style.css</button>
+                        <button onclick="switchFile('js')" id="tab-js" class="px-4 py-2 text-sm font-mono text-gray-400 bg-transparent hover:bg-gray-800 border-t-2 border-transparent flex items-center"><i class="fa-brands fa-js text-yellow-400 mr-2"></i>script.js</button>
+                    </div>
+                    
+                    <div>
+                        <input type="file" id="workspace-upload" webkitdirectory directory multiple class="hidden" onchange="handleFileUpload(event)">
+                        <button onclick="document.getElementById('workspace-upload').click()" class="text-xs text-gray-400 hover:text-white bg-ide-bg border border-ide-border px-3 py-1 rounded transition-colors" title="Upload Folder">
+                            <i class="fa-solid fa-folder-open mr-1 text-yellow-500"></i> Upload
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative bg-ide-bg overflow-hidden">
+                    <div id="editor-html" class="editor-container">
+                        <div class="line-numbers" id="lines-html"><span>1</span></div>
+                        <textarea id="code-html" class="code-input" oninput="syncScroll('html'); updatePreview();" onscroll="syncScroll('html')" spellcheck="false">&lt;!-- Enter a Task ID above and click Load --&gt;</textarea>
+                    </div>
+                    <div id="editor-css" class="editor-container hidden-pane">
+                        <div class="line-numbers" id="lines-css"><span>1</span></div>
+                        <textarea id="code-css" class="code-input" oninput="syncScroll('css'); updatePreview();" onscroll="syncScroll('css')" spellcheck="false">/* Waiting for Task Load... */</textarea>
+                    </div>
+                    <div id="editor-js" class="editor-container hidden-pane">
+                        <div class="line-numbers" id="lines-js"><span>1</span></div>
+                        <textarea id="code-js" class="code-input" oninput="syncScroll('js'); updatePreview();" onscroll="syncScroll('js')" spellcheck="false">// Waiting for Task Load...</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="h-[40%] flex flex-col bg-white relative">
+                <div class="bg-gray-100 border-b border-gray-200 px-3 py-1.5 flex justify-between items-center text-xs text-gray-500 font-bold">
+                    <span><i class="fa-solid fa-eye mr-2 text-indigo-500"></i>Live Preview</span>
+                    <span class="text-[10px] bg-yellow-100 text-yellow-800 px-2 rounded border border-yellow-200"><i class="fa-solid fa-shield-halved mr-1"></i>Sandboxed</span>
+                </div>
+                <div class="flex-1 bg-checkerboard relative overflow-hidden">
+                    <iframe id="live-preview" sandbox="allow-scripts" class="w-full h-full border-none absolute inset-0 bg-white"></iframe>
+                </div>
+            </div>
+        </section>
+
+        <section class="w-1/2 flex flex-col bg-white text-gray-800 relative results-scroll overflow-y-auto">
+            
+            <div id="res-state-empty" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10 p-8 text-center">
+                <div class="w-24 h-24 bg-white rounded-full shadow-sm flex items-center justify-center mb-6 border border-gray-100">
+                    <i class="fa-solid fa-list-check text-4xl text-gray-300"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Workspace Ready</h2>
+                <p class="text-gray-500 text-sm max-w-sm mx-auto">Enter the Task ID provided by your trainer in the top navbar and click <strong class="text-purple-600">Load</strong>.</p>
+            </div>
+
+            <div id="res-state-brief" class="hidden-pane flex-col min-h-full bg-white z-10 absolute inset-0 overflow-y-auto">
+                <div class="bg-slate-900 p-6 shadow-md text-white">
+                    <span class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-1 block">Task Briefing</span>
+                    <h2 id="brief-title" class="text-2xl font-bold">---</h2>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2 border-b pb-1"><i class="fa-solid fa-circle-info mr-2 text-blue-500"></i>Instructions</h3>
+                        <p id="brief-desc" class="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">---</p>
+                    </div>
+                    <div class="mb-6">
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b pb-1"><i class="fa-solid fa-image mr-2 text-amypo-green"></i>Target Design (Match this perfectly)</h3>
+                        <div class="border border-gray-200 shadow-sm p-2 bg-checkerboard rounded-lg">
+                            <img id="brief-img" src="" class="w-full h-auto border border-gray-300 rounded shadow-md" alt="Target Baseline">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="res-state-loading" class="hidden-pane absolute inset-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-sm z-20 p-8 text-center">
+                <div class="relative w-20 h-20 mb-6">
+                    <div class="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-amypo-green rounded-full border-t-transparent animate-spin"></div>
+                    <i class="fa-brands fa-chrome absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl text-gray-400"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800 mb-2">Evaluating Submission...</h2>
+                <p class="text-gray-500 text-sm">Running DOM tests, CSS styling, JS behavior, and Visual diffs.</p>
+            </div>
+
+            <div id="res-state-results" class="hidden-pane flex-col min-h-full relative z-10 bg-white absolute inset-0 overflow-y-auto">
+                <div class="bg-slate-900 text-white p-6 flex justify-between items-center flex-shrink-0 shadow-md">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center"><i class="fa-solid fa-chart-simple text-amypo-green mr-3"></i>Evaluation Report</h2>
+                    </div>
+                    <div class="text-right flex items-center gap-4">
+                        <div class="text-sm text-gray-400">Total Score</div>
+                        <div class="text-4xl font-black text-amypo-green bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 shadow-inner" id="display-total-score">0/100</div>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-8 flex-1">
+                    
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="font-bold text-gray-700 text-xs uppercase">DOM Logic</span>
+                                <span class="font-black text-gray-900 text-lg" id="score-html">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2"><div id="bar-html" class="bg-orange-500 h-2 rounded-full w-0 transition-all duration-1000"></div></div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="font-bold text-gray-700 text-xs uppercase">CSS Rules</span>
+                                <span class="font-black text-gray-900 text-lg" id="score-css">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2"><div id="bar-css" class="bg-blue-500 h-2 rounded-full w-0 transition-all duration-1000"></div></div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="font-bold text-gray-700 text-xs uppercase">JS Logic</span>
+                                <span class="font-black text-gray-900 text-lg" id="score-js">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2"><div id="bar-js" class="bg-yellow-400 h-2 rounded-full w-0 transition-all duration-1000"></div></div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-end mb-2">
+                                <span class="font-bold text-gray-700 text-xs uppercase">Visual Match</span>
+                                <span class="font-black text-gray-900 text-lg" id="score-visual">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2"><div id="bar-visual" class="bg-amypo-green h-2 rounded-full w-0 transition-all duration-1000"></div></div>
+                        </div>
+                    </div>
+
+                    <div id="standard-errors" class="hidden-pane">
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b pb-2 text-red-600">Failed Engine Assertions</h3>
+                        <ul id="failed-tests-list" class="space-y-3"></ul>
+                    </div>
+
+                    <div id="ai-feedback-container" class="mt-8">
+                        </div>
+
+                    <div class="mt-8">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider">Visual PixelMatch Engine</h3>
+                            <span class="text-xs font-mono bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 font-bold shadow-sm">
+                                <span id="diff-percent">0.0</span>% Deviation
+                            </span>
+                        </div>
+                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                            <div class="flex bg-gray-100 border-b border-gray-200">
+                                <button onclick="switchImage('expected')" class="img-tab flex-1 py-3 text-xs font-bold text-gray-500 bg-gray-100">Expected</button>
+                                <button onclick="switchImage('actual')" class="img-tab flex-1 py-3 text-xs font-bold text-gray-500 bg-gray-100">Yours</button>
+                                <button onclick="switchImage('diff')" class="img-tab flex-1 py-3 text-xs font-bold text-purple-600 bg-white border-b-2 border-purple-600">Heatmap Diff</button>
+                            </div>
+                            <div class="bg-checkerboard p-4 flex justify-center items-center min-h-[300px] overflow-auto">
+                                <img id="img-expected" src="" class="hidden-pane max-w-full h-auto border border-gray-300">
+                                <img id="img-actual" src="" class="hidden-pane max-w-full h-auto border border-gray-300">
+                                <img id="img-diff" src="" class="max-w-full h-auto border border-gray-300 shadow-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </main>
+
+   <script>
+        // --- 1. CORE IDE FUNCTIONS ---
+        function syncScroll(lang) {
+            const textarea = document.getElementById(`code-${lang}`);
+            const lines = document.getElementById(`lines-${lang}`);
+            lines.scrollTop = textarea.scrollTop;
+            const lineCount = textarea.value.split('\n').length;
+            let linesHtml = '';
+            for (let i = 1; i <= lineCount; i++) linesHtml += `<span>${i}</span>`;
+            lines.innerHTML = linesHtml;
+        }
+
+        function switchFile(lang) {
+            ['html', 'css', 'js'].forEach(l => {
+                document.getElementById(`editor-${l}`).classList.add('hidden-pane');
+                document.getElementById(`tab-${l}`).className = "px-4 py-2 text-sm font-mono text-gray-400 bg-transparent hover:bg-gray-800 border-t-2 border-transparent flex items-center";
+            });
+            document.getElementById(`editor-${lang}`).classList.remove('hidden-pane');
+            document.getElementById(`tab-${lang}`).className = "px-4 py-2 text-sm font-mono text-white bg-ide-bg border-t-2 border-ide-accent flex items-center";
+            syncScroll(lang);
+        }
+
+        window.onload = () => { syncScroll('html'); syncScroll('css'); syncScroll('js'); };
+
+        function switchImage(view) {
+            ['expected', 'actual', 'diff'].forEach(v => {
+                document.getElementById(`img-${v}`).classList.add('hidden-pane');
+            });
+            document.getElementById(`img-${view}`).classList.remove('hidden-pane');
+            const tabs = document.querySelectorAll('.img-tab');
+            tabs.forEach(tab => {
+                tab.className = "img-tab flex-1 py-3 text-xs font-bold text-gray-500 hover:text-gray-900 border-r border-gray-200 bg-gray-100 transition-colors";
+            });
+            event.target.className = "img-tab flex-1 py-3 text-xs font-bold text-purple-600 bg-white border-b-2 border-purple-600 transition-colors";
+        }
+
+        // --- 2. LIVE PREVIEW LOGIC ---
+        function updatePreview() {
+            const htmlStr = document.getElementById('code-html').value;
+            const cssStr = document.getElementById('code-css').value;
+            const jsStr = document.getElementById('code-js').value;
+            const iframe = document.getElementById('live-preview');
+            
+            // Build the injected document
+            const combinedContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>${cssStr}</style>
+                </head>
+                <body>
+                    ${htmlStr}
+                    <script>${jsStr}<\/script>
+                </body>
+                </html>
+            `;
+            // Push to srcdoc for immediate, sandboxed rendering
+            iframe.srcdoc = combinedContent;
+        }
+
+        // --- 3. FOLDER / FILE UPLOAD LOGIC ---
+        function handleFileUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    if (file.name === 'index.html') { document.getElementById('code-html').value = content; syncScroll('html'); }
+                    if (file.name === 'style.css') { document.getElementById('code-css').value = content; syncScroll('css'); }
+                    if (file.name === 'script.js') { document.getElementById('code-js').value = content; syncScroll('js'); }
+                    updatePreview();
+                };
+                reader.readAsText(file);
+            });
+            // Reset input so they can upload again if needed
+            event.target.value = "";
+        }
+
+        // --- 4. ANTI-CHEAT, TIMER & AUTO-SAVE LOGIC ---
+// --- 4. ANTI-CHEAT, TIMER & AUTO-SAVE LOGIC ---
+        let evaluationActive = false;
+        let strikes = 0;
+        const MAX_STRIKES = 3;
+        let examTimerInterval;
+        let timeRemaining = 0;
+
+        // Will be updated dynamically when hitting "Load"
+        let STRICT_MODE = true;
+
+        // Auto-Save Logic
+        function autoSaveCode() {
+            if (!evaluationActive) return;
+            const taskId = document.getElementById('input-task-id').value.trim();
+            const data = {
+                html: document.getElementById('code-html').value,
+                css: document.getElementById('code-css').value,
+                js: document.getElementById('code-js').value
+            };
+            localStorage.setItem(`prism_autosave_${taskId}`, JSON.stringify(data));
+        }
+
+        // Timer Logic
+        function startTimer(minutes) {
+            timeRemaining = minutes * 60;
+            document.getElementById('exam-timer-container').classList.remove('hidden-pane');
+            
+            examTimerInterval = setInterval(() => {
+                timeRemaining--;
+                const m = String(Math.floor(timeRemaining / 60)).padStart(2, '0');
+                const s = String(timeRemaining % 60).padStart(2, '0');
+                document.getElementById('exam-timer').innerText = `${m}:${s}`;
+
+                if (timeRemaining <= 300) { // 5 mins left
+                    document.getElementById('exam-timer-container').classList.replace('text-red-400', 'text-red-600');
+                    document.getElementById('exam-timer-container').classList.add('animate-pulse');
+                }
+
+                if (timeRemaining <= 0) {
+                    clearInterval(examTimerInterval);
+                    alert("Time is up! Auto-submitting your code.");
+                    submitEvaluation();
+                }
+            }, 1000);
+        }
+
+        // Malpractice Logger
+        async function triggerStrike(violationType) {
+            if (!evaluationActive) return;
+            strikes++;
+            
+            // Log to backend silently
+            const taskId = document.getElementById('input-task-id').value.trim();
+            fetch('/api/malpractice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question_id: taskId, violation_type: violationType, strike_count: strikes })
+            }).catch(e => console.error("Logging failed", e));
+
+            if (strikes >= MAX_STRIKES) {
+                alert("Maximum violations reached. Your assessment is being automatically submitted.");
+                submitEvaluation();
+            } else {
+                document.getElementById('strike-count-display').innerText = strikes;
+                document.getElementById('strike-modal').classList.remove('hidden-pane');
+                document.getElementById('strike-message').innerText = violationType === 'tab_switch' ? "You switched tabs." : "You exited full-screen mode.";
+            }
+        }
+
+        function resumeExam() {
+            document.getElementById('strike-modal').classList.add('hidden-pane');
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            }
+        }
+
+        // Listeners for cheating (ONLY ACTIVATE IF STRICT MODE IS ON)
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && evaluationActive && STRICT_MODE) {
+                triggerStrike('tab_switch');
+            }
+        });
+
+        document.addEventListener("fullscreenchange", () => {
+            if (!document.fullscreenElement && evaluationActive && strikes < MAX_STRIKES && STRICT_MODE) {
+                triggerStrike('exited_fullscreen');
+            }
+        });
+
+        // Add autoSave to your updatePreview function so it saves on every keystroke
+        const originalUpdatePreview = updatePreview;
+        updatePreview = function() {
+            originalUpdatePreview();
+            autoSaveCode();
+        };
+
+        // --- 5. LOAD TASK & FULLSCREEN LOGIC ---
+// --- 5. LOAD TASK & FULLSCREEN LOGIC ---
+        async function loadTask() {
+            const taskId = document.getElementById('input-task-id').value.trim();
+            if(!taskId) return alert("Enter a valid Task ID");
+            
+            const btn = document.getElementById('btn-load-task');
+            btn.innerText = "Loading...";
+
+            try {
+                // 1. Fetch task and policy first
+                const res = await fetch(`/api/questions/${taskId}`);
+                const data = await res.json();
+                if(!res.ok) throw new Error(data.error);
+
+                // 2. DYNAMICALLY SYNC WITH ADMIN POLICY
+                STRICT_MODE = data.strict_mode === true;
+
+                // 3. Only force full-screen if STRICT MODE is ON
+                if (STRICT_MODE && document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+
+                document.getElementById('brief-title').innerText = data.title;
+                document.getElementById('brief-desc').innerText = data.description;
+                document.getElementById('brief-img').src = data.baseline_image + "?t=" + new Date().getTime();
+
+                document.getElementById('res-state-empty').classList.add('hidden-pane');
+                document.getElementById('res-state-results').classList.add('hidden-pane');
+                document.getElementById('res-state-brief').classList.remove('hidden-pane');
+                document.getElementById('res-state-brief').classList.add('flex');
+
+                const subBtn = document.getElementById('btn-submit');
+                subBtn.disabled = false;
+                subBtn.classList.remove('bg-gray-700', 'text-gray-400', 'cursor-not-allowed');
+                subBtn.classList.add('bg-amypo-green', 'hover:bg-green-600', 'text-white');
+
+                // Check for Auto-Save
+                const savedCode = localStorage.getItem(`prism_autosave_${taskId}`);
+                if (savedCode) {
+                    const parsed = JSON.parse(savedCode);
+                    document.getElementById('code-html').value = parsed.html;
+                    document.getElementById('code-css').value = parsed.css;
+                    document.getElementById('code-js').value = parsed.js;
+                    alert("Un-submitted code restored from previous session.");
+                } else {
+                    let htmlTemplate = `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n`;
+                    if(data.allowed_libraries && data.allowed_libraries.includes('tailwind')) {
+                        htmlTemplate += `  \n  <script src="https://cdn.tailwindcss.com"><\/script>\n`;
+                    }
+                    if(data.allowed_libraries && data.allowed_libraries.includes('bootstrap')) {
+                        htmlTemplate += `  \n  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">\n`;
+                    }
+                    htmlTemplate += `</head>\n<body>\n  \n  \n</body>\n</html>`;
+                    document.getElementById('code-html').value = htmlTemplate;
+                    document.getElementById('code-css').value = `/* Add your CSS styles */\n\n`;
+                    document.getElementById('code-js').value = `// Add your JS logic \n\n`;
+                }
+                
+                syncScroll('html'); syncScroll('css'); syncScroll('js');
+                
+                evaluationActive = true;
+                strikes = 0;
+                updatePreview();
+                
+                startTimer(data.time_limit || 45); 
+
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                btn.innerText = "Load";
+            }
+        }
+
+        // --- 6. SUBMIT AND EVALUATE LOGIC ---
+        async function submitEvaluation() {
+            const taskId = document.getElementById('input-task-id').value.trim();
+            const btn = document.getElementById('btn-submit');
+            
+            document.getElementById('res-state-brief').classList.add('hidden-pane');
+            document.getElementById('res-state-loading').classList.remove('hidden-pane');
+            btn.disabled = true;
+
+            try {
+                const payload = {
+                    question_id: taskId,
+                    html: document.getElementById('code-html').value,
+                    css: document.getElementById('code-css').value,
+                    js: document.getElementById('code-js').value
+                };
+
+                const res = await fetch('/api/submissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if(res.ok) {
+                    renderDashboard(data.results);
+                } else {
+                    throw new Error(data.error || "Engine failed");
+                }
+            } catch (e) {
+                alert(`Evaluation Error: ${e.message}`);
+                document.getElementById('res-state-loading').classList.add('hidden-pane');
+                document.getElementById('res-state-brief').classList.remove('hidden-pane');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- 7. RENDER RESULTS & AI DASHBOARD ---
+        function renderDashboard(results) {
+            document.getElementById('res-state-loading').classList.add('hidden-pane');
+            document.getElementById('res-state-results').classList.remove('hidden-pane');
+            document.getElementById('res-state-results').classList.add('flex');
+            
+            // Stop the clock!
+            clearInterval(examTimerInterval);
+            document.getElementById('exam-timer-container').classList.add('hidden-pane');
+
+            // Turn off anti-cheat once submitted
+            evaluationActive = false;
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(err => console.log(err));
+            }
+
+            const run = results.evaluationRun;
+            const arts = results.artifacts;
+            // Updated to include 'js' max score
+            const max = run.maxMarks || { html: 20, css: 35, js: 35, visual: 10 }; 
+            const totalMax = max.html + max.css + max.js + max.visual;
+            
+            document.getElementById('display-total-score').innerText = `${run.totalScore} / ${totalMax}`;
+
+            // Set scores and widths (Updated for 4 cards)
+            ['html', 'css', 'js', 'visual'].forEach(metric => {
+                document.getElementById(`score-${metric}`).innerText = `${run.breakdown[metric] || 0}/${max[metric]}`;
+                setTimeout(() => {
+                    const width = max[metric] > 0 ? ((run.breakdown[metric] || 0) / max[metric]) * 100 : 0;
+                    document.getElementById(`bar-${metric}`).style.width = `${width}%`;
+                }, 100);
+            });
+
+            document.getElementById('diff-percent').innerText = arts.diffPercentage ? arts.diffPercentage.toFixed(2) : "0.00";
+            const cb = `?t=${new Date().getTime()}`;
+            document.getElementById('img-expected').src = arts.expectedImagePath + cb;
+            document.getElementById('img-actual').src = arts.actualImagePath + cb;
+            document.getElementById('img-diff').src = arts.diffImagePath + cb;
+
+            // --- AI Feedback Engine Rendering ---
+            const aiContainer = document.getElementById('ai-feedback-container');
+            if (results.aiFeedback) {
+                const ai = results.aiFeedback;
+                let aiHtml = `
+                    <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b pb-2">
+                        <i class="fa-solid fa-robot mr-2 text-indigo-500"></i>AI Visual Feedback Analysis
+                    </h3>
+                    <div class="space-y-4">
+                `;
+
+                if (ai.correct_elements && ai.correct_elements.length > 0) {
+                    aiHtml += `<div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 class="font-bold text-green-800 text-xs uppercase mb-2"><i class="fa-solid fa-check-circle mr-1"></i> Looks Good</h4>
+                        <ul class="list-disc list-inside text-sm text-green-700 space-y-1">${ai.correct_elements.map(item => `<li>${item}</li>`).join('')}</ul>
+                    </div>`;
+                }
+
+                if (ai.incorrect_elements && ai.incorrect_elements.length > 0) {
+                    aiHtml += `<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <h4 class="font-bold text-red-800 text-xs uppercase mb-2"><i class="fa-solid fa-times-circle mr-1"></i> Visual Mismatches</h4>
+                        <ul class="list-disc list-inside text-sm text-red-700 space-y-1">${ai.incorrect_elements.map(item => `<li>${item}</li>`).join('')}</ul>
+                    </div>`;
+                }
+
+                if (ai.improvement_suggestions && ai.improvement_suggestions.length > 0) {
+                    aiHtml += `<div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 shadow-sm">
+                        <h4 class="font-bold text-indigo-800 text-xs uppercase mb-2"><i class="fa-solid fa-lightbulb mr-1 text-yellow-500"></i> How to Fix This</h4>
+                        <ul class="list-disc list-inside text-sm text-indigo-700 space-y-1">${ai.improvement_suggestions.map(item => `<li>${item}</li>`).join('')}</ul>
+                    </div>`;
+                }
+                aiHtml += `</div>`;
+                aiContainer.innerHTML = aiHtml;
+            } else {
+                aiContainer.innerHTML = `<div class="bg-gray-50 border border-gray-200 rounded-xl p-5 text-center text-gray-500 text-sm">AI analysis is currently unavailable for this submission.</div>`;
+            }
+
+            // --- Standard Engine Assertions Rendering ---
+            const failList = document.getElementById('failed-tests-list');
+            const errContainer = document.getElementById('standard-errors');
+            failList.innerHTML = '';
+            
+            if (run.failedTests && run.failedTests.length > 0) {
+                errContainer.classList.remove('hidden-pane');
+                run.failedTests.forEach(test => {
+                    failList.innerHTML += `<li class="bg-red-50 text-red-700 text-xs p-3 rounded border border-red-100"><strong>${test.id || 'Error'}:</strong> ${test.hint || "Check assertion logic."}</li>`;
+                });
+            } else {
+                errContainer.classList.add('hidden-pane');
+            }
+        }
+    </script>
+</body>
+</html>

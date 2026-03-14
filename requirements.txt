@@ -1,0 +1,11 @@
+<<<<<<< HEAD
+Flask
+python-dotenv
+google-generativeai
+requests
+=======
+Flask==3.0.3
+pymongo==4.7.0
+python-dotenv==1.0.1
+Werkzeug==3.0.1
+>>>>>>> bd27a5d (Updated major features and added some more features.)

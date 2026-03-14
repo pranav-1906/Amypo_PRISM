@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <title>PRISM - Admin Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'amypo-green': '#2b8a44',
+                        'amypo-dark': '#0f172a',
+                    },
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .hidden-pane { display: none !important; }
+        .bg-checkerboard { background-color: #f8fafc; background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col font-sans overflow-hidden">
+
+    <nav class="bg-amypo-dark border-b border-slate-800 shadow-lg z-20 flex-shrink-0">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <img src="/static/logo.png" alt="PRISM Logo" class="h-8 w-auto mr-3 drop-shadow-md">
+                    <div class="pl-3 border-l-2 border-slate-700 flex flex-col justify-center">
+                        <span class="font-black text-xl text-white tracking-tight leading-none">PRISM</span>
+                        <span class="text-[10px] text-blue-400 font-bold uppercase tracking-wider mt-0.5">Admin Console</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4 sm:space-x-6 text-sm font-medium">
+                    <span class="text-emerald-400 flex items-center bg-emerald-400/10 px-2 py-1 rounded-md text-xs border border-emerald-400/20" title="System Online">
+                        <i class="fa-solid fa-circle-dot text-[10px] animate-pulse mr-1.5"></i> Online
+                    </span>
+                    <a href="/api/logout" class="text-red-400 hover:text-red-500 bg-red-400/10 p-2 rounded-lg transition-colors ml-2 border border-transparent hover:border-red-400/30" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-hidden flex flex-col max-w-screen-2xl w-full mx-auto p-4 sm:p-6 gap-6">
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Submissions</p>
+                    <h3 class="text-3xl font-black text-slate-900" id="kpi-subs">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-server"></i></div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Platform Avg Score</p>
+                    <h3 class="text-3xl font-black text-slate-900" id="kpi-score">0%</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-chart-line"></i></div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Active Tasks</p>
+                    <h3 class="text-3xl font-black text-slate-900" id="kpi-tasks">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-folder-open"></i></div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-red-200 p-5 flex items-center justify-between shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] transition-shadow">
+                <div>
+                    <p class="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Security Flags</p>
+                    <h3 class="text-3xl font-black text-red-600" id="kpi-flags">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-shield-virus"></i></div>
+            </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row flex-1 gap-6 overflow-hidden">
+            
+            <aside class="w-full lg:w-72 flex flex-col gap-4 flex-shrink-0 overflow-y-auto pr-1">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex-1">
+                    <h3 class="text-sm font-black text-slate-800 border-b border-slate-100 pb-3 mb-5 flex items-center"><i class="fa-solid fa-globe text-blue-500 mr-2 text-lg"></i>Global Policy</h3>
+                    <p class="text-xs text-slate-500 mb-6 leading-relaxed">Toggle allowed tools and security measures. Changes sync across all portals instantly.</p>
+                    
+                    <div class="space-y-5">
+                        <label class="flex items-center text-sm font-bold text-slate-800 cursor-pointer group bg-red-50 p-3 rounded-xl border border-red-100 transition-colors hover:bg-red-100">
+                            <input type="checkbox" id="pol-strict" onchange="updatePolicy()" class="w-4 h-4 text-red-600 focus:ring-red-500 border-red-300 rounded mr-3">
+                            <span class="text-red-700 flex items-center"><i class="fa-solid fa-shield-halved mr-2 opacity-70"></i> Strict Anti-Cheat</span>
+                        </label>
+                        
+                        <div class="h-px bg-slate-100 w-full my-2"></div>
+                        
+                        <label class="flex items-center text-sm font-medium text-slate-700 cursor-pointer group px-1 hover:text-amypo-green transition-colors">
+                            <input type="checkbox" id="pol-tailwind" onchange="updatePolicy()" class="w-4 h-4 text-amypo-green focus:ring-amypo-green border-slate-300 rounded mr-3">
+                            Allow Tailwind CSS
+                        </label>
+                        <label class="flex items-center text-sm font-medium text-slate-700 cursor-pointer group px-1 hover:text-amypo-green transition-colors">
+                            <input type="checkbox" id="pol-bootstrap" onchange="updatePolicy()" class="w-4 h-4 text-amypo-green focus:ring-amypo-green border-slate-300 rounded mr-3">
+                            Allow Bootstrap 5
+                        </label>
+                        <label class="flex items-center text-sm font-medium text-slate-700 cursor-pointer group px-1 opacity-70">
+                            <input type="checkbox" id="pol-react" onchange="updatePolicy()" class="w-4 h-4 text-slate-400 border-slate-300 rounded mr-3">
+                            Allow React.js <span class="ml-auto text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-wider">Beta</span>
+                        </label>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative min-h-[400px]">
+                
+                <div class="bg-slate-50 border-b border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-center gap-4 z-10">
+                    <div class="flex gap-1 bg-slate-200/50 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+                        <button onclick="switchTab('evals')" id="btn-tab-evals" class="px-4 py-2 text-sm font-bold bg-white text-blue-600 rounded-lg shadow-sm whitespace-nowrap transition-all"><i class="fa-solid fa-list-check mr-2"></i>Evaluations</button>
+                        <button onclick="switchTab('trainers')" id="btn-tab-trainers" class="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 rounded-lg whitespace-nowrap transition-all"><i class="fa-solid fa-chalkboard-user mr-2"></i>Trainers</button>
+                        <button onclick="switchTab('alerts')" id="btn-tab-alerts" class="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 rounded-lg whitespace-nowrap transition-all"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Alerts</button>
+                    </div>
+                    
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:flex-none">
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Search data..." class="w-full text-sm border border-slate-300 rounded-xl pl-8 pr-3 py-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none">
+                        </div>
+                        <button onclick="exportCSV()" class="text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 px-4 py-2 rounded-xl font-bold transition-colors shadow-sm whitespace-nowrap" title="Export to CSV">
+                            <i class="fa-solid fa-download"></i>
+                        </button>
+                        <button onclick="fetchAllData()" class="text-sm bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-xl shadow-sm transition-colors text-slate-600" title="Refresh Data">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="view-evals" class="flex-1 overflow-x-auto overflow-y-auto">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead class="sticky top-0 bg-white/95 backdrop-blur z-10 shadow-sm">
+                            <tr class="text-[10px] text-slate-500 uppercase tracking-widest border-b border-slate-200 bg-slate-50/50">
+                                <th class="p-4 font-bold">Sub ID</th>
+                                <th class="p-4 font-bold">Student / Task</th>
+                                <th class="p-4 font-bold">Score</th>
+                                <th class="p-4 font-bold">Timestamp</th>
+                                <th class="p-4 font-bold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body" class="text-sm divide-y divide-slate-100">
+                            </tbody>
+                    </table>
+                </div>
+
+                <div id="view-alerts" class="hidden-pane flex-1 overflow-x-auto overflow-y-auto bg-red-50/30">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead class="sticky top-0 bg-white/95 backdrop-blur z-10 shadow-sm">
+                            <tr class="text-[10px] text-red-800 uppercase tracking-widest border-b border-red-200 bg-red-50/80">
+                                <th class="p-4 font-bold">Alert Time</th>
+                                <th class="p-4 font-bold">Student Name</th>
+                                <th class="p-4 font-bold">Task ID</th>
+                                <th class="p-4 font-bold">Violation Type</th>
+                                <th class="p-4 font-bold">Strike Level</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table-body" class="text-sm divide-y divide-red-100">
+                            </tbody>
+                    </table>
+                </div>
+
+                <div id="view-trainers" class="hidden-pane flex-1 overflow-y-auto bg-slate-50 p-6">
+                    <div id="trainers-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div id="artifact-modal" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] sm:h-[90vh] flex flex-col overflow-hidden ring-1 ring-white/20">
+            <div class="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600"><i class="fa-solid fa-microscope text-xl"></i></div>
+                    <div>
+                        <h3 class="font-black text-slate-900 text-lg leading-none">Visual Artifact Inspector</h3>
+                        <p class="text-xs text-slate-500 font-mono mt-1" id="modal-sub-id">Sub ID: ---</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-2xl font-black bg-slate-200/50 text-slate-800 px-4 py-1 rounded-xl border border-slate-300" id="modal-score">0/100</div>
+                    <button onclick="closeModal()" class="w-10 h-10 rounded-xl bg-slate-200/50 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors border border-transparent hover:border-red-200"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                <div class="w-full lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-200 bg-[#1e1e1e] flex flex-col h-1/2 lg:h-full">
+                    <div class="flex bg-[#252526] border-b border-[#333] overflow-x-auto">
+                        <button onclick="switchCodeTab('html')" class="px-5 py-3 text-xs font-mono text-white bg-[#1e1e1e] border-t-2 border-blue-500" id="modal-tab-html">HTML</button>
+                        <button onclick="switchCodeTab('css')" class="px-5 py-3 text-xs font-mono text-slate-400 hover:text-white border-t-2 border-transparent" id="modal-tab-css">CSS</button>
+                        <button onclick="switchCodeTab('js')" class="px-5 py-3 text-xs font-mono text-slate-400 hover:text-white border-t-2 border-transparent" id="modal-tab-js">JS</button>
+                        <button onclick="switchCodeTab('json')" class="px-5 py-3 text-xs font-mono text-slate-400 hover:text-white ml-auto border-t-2 border-transparent" id="modal-tab-json">JSON</button>
+                    </div>
+                    <textarea id="modal-code-html" class="flex-1 w-full bg-transparent text-slate-300 font-mono text-xs p-5 resize-none outline-none" readonly></textarea>
+                    <textarea id="modal-code-css" class="hidden-pane flex-1 w-full bg-transparent text-slate-300 font-mono text-xs p-5 resize-none outline-none" readonly></textarea>
+                    <textarea id="modal-code-js" class="hidden-pane flex-1 w-full bg-transparent text-slate-300 font-mono text-xs p-5 resize-none outline-none" readonly></textarea>
+                    <textarea id="modal-code-json" class="hidden-pane flex-1 w-full bg-transparent text-emerald-400 font-mono text-xs p-5 resize-none outline-none" readonly></textarea>
+                </div>
+
+                <div class="w-full lg:w-2/3 flex flex-col bg-white overflow-y-auto h-1/2 lg:h-full">
+                    <div class="p-6 sm:p-8 border-b border-slate-200">
+                        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-widest mb-5 flex items-center"><i class="fa-solid fa-camera mr-2 text-amypo-green"></i>PixelMatch Result</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Expected Baseline</p>
+                                <div class="bg-checkerboard border border-slate-300 rounded-xl p-2"><img id="modal-img-expected" class="w-full h-auto shadow-sm rounded-lg"></div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Student Actual</p>
+                                <div class="bg-checkerboard border border-slate-300 rounded-xl p-2"><img id="modal-img-actual" class="w-full h-auto shadow-sm rounded-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6 sm:p-8 bg-slate-50 flex-1">
+                        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-widest mb-5 flex items-center"><i class="fa-solid fa-robot mr-2 text-indigo-600"></i>AI Visual Analysis</h4>
+                        <div id="modal-ai-content" class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-4">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allRuns = [];
+        let allAlerts = [];
+
+        // --- FETCH ENGINE ---
+        async function fetchAllData() {
+            fetchSettings();
+            fetchKPIs();
+            fetchEvaluations();
+            fetchAlerts();
+            fetchTrainers();
+        }
+
+        async function fetchKPIs() {
+            const res = await fetch('/api/admin/kpis');
+            const data = await res.json();
+            document.getElementById('kpi-subs').innerText = data.total_submissions;
+            document.getElementById('kpi-score').innerText = data.avg_score + '%';
+            document.getElementById('kpi-tasks').innerText = data.total_tasks;
+            document.getElementById('kpi-flags').innerText = data.malpractice_flags;
+        }
+
+        async function fetchSettings() {
+            const res = await fetch('/api/admin/settings');
+            const data = await res.json();
+            
+            const strictBox = document.getElementById('pol-strict');
+            if (strictBox) strictBox.checked = data.strict_mode !== false; 
+            document.getElementById('pol-tailwind').checked = data.allow_tailwind !== false;
+            document.getElementById('pol-bootstrap').checked = data.allow_bootstrap !== false;
+            document.getElementById('pol-react').checked = data.allow_react === true;
+        }
+
+        async function updatePolicy() {
+            const payload = {
+                strict_mode: document.getElementById('pol-strict') ? document.getElementById('pol-strict').checked : true,
+                allow_tailwind: document.getElementById('pol-tailwind').checked,
+                allow_bootstrap: document.getElementById('pol-bootstrap').checked,
+                allow_react: document.getElementById('pol-react').checked
+            };
+            await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+        }
+
+        // --- TABLES & UI ---
+        async function fetchEvaluations() {
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading logs...</td></tr>';
+            try {
+                const res = await fetch('/api/admin/evaluation_runs');
+                allRuns = await res.json();
+                renderEvalTable(allRuns);
+            } catch(e) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-red-500">Failed to fetch.</td></tr>'; }
+        }
+
+        async function fetchTrainers() {
+            const container = document.getElementById('trainers-container');
+            container.innerHTML = '<p class="text-slate-500 col-span-full text-center py-12"><i class="fa-solid fa-spinner fa-spin text-2xl mb-3 block"></i>Loading trainers...</p>';
+            
+            try {
+                const res = await fetch('/api/admin/trainers_info');
+                const trainers = await res.json();
+                container.innerHTML = '';
+                
+                if (trainers.length === 0) return container.innerHTML = '<div class="col-span-full bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500">No trainers registered yet.</div>';
+
+                trainers.forEach(t => {
+                    let studentHtml = t.students.map(s => `<span class="inline-flex items-center bg-white text-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm mr-2 mb-2"><i class="fa-regular fa-user text-slate-400 mr-2"></i>${s.name} <span class="text-[10px] text-slate-400 ml-1 font-mono">(${s.register_number || 'N/A'})</span></span>`).join('');
+                    if (!studentHtml) studentHtml = '<p class="text-xs text-slate-400 italic bg-white p-3 rounded-lg border border-slate-100">No students found matching these classes.</p>';
+
+                    const classesHtml = t.trainer_classes ? t.trainer_classes.map(c => `<span class="bg-purple-100 text-purple-700 font-bold text-[10px] px-2.5 py-1 rounded-md uppercase tracking-wider mr-2">${c}</span>`).join('') : '<span class="text-xs text-slate-400">None</span>';
+
+                    container.innerHTML += `
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                            <div class="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-xl shadow-inner">${t.name[0]}</div>
+                                    <div>
+                                        <h4 class="font-black text-slate-900 text-lg leading-tight">${t.name}</h4>
+                                        <p class="text-xs text-slate-500 font-mono mt-1">${t.trainer_id || t.email}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+                                    <span class="text-2xl font-black text-slate-800 leading-none">${t.student_count}</span>
+                                    <p class="text-[9px] uppercase tracking-widest font-bold text-slate-400 mt-1">Students</p>
+                                </div>
+                            </div>
+                            <div class="p-5 border-b border-slate-100">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Assigned Classes</p>
+                                <div class="flex flex-wrap">${classesHtml}</div>
+                            </div>
+                            <div class="p-5 flex-1 bg-slate-50/50">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Student Roster</p>
+                                <div class="max-h-40 overflow-y-auto pr-2">${studentHtml}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-500 text-center col-span-full py-8 border border-red-200 bg-red-50 rounded-xl">Failed to load trainers.</p>';
+            }
+        }
+
+        function renderEvalTable(data) {
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = '';
+            if(data.length === 0) return tbody.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-slate-400 border border-dashed">No evaluations found.</td></tr>';
+
+            data.forEach(run => {
+                const time = new Date(run.timestamp).toLocaleString();
+                const scoreColor = run.score >= 80 ? 'text-emerald-700' : (run.score >= 50 ? 'text-amber-600' : 'text-red-600');
+                const scoreBg = run.score >= 80 ? 'bg-emerald-50 border-emerald-200' : (run.score >= 50 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200');
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50/80 transition-colors group">
+                        <td class="p-4 font-mono text-xs text-blue-600">${run.submission_id}</td>
+                        <td class="p-4 text-sm">
+                            <span class="block font-bold text-slate-800"><i class="fa-regular fa-user mr-2 text-slate-400"></i>${run.student_name || 'Unknown'}</span>
+                            <span class="block text-slate-500 mt-1 text-xs"><i class="fa-solid fa-hashtag mr-2 opacity-50"></i>${run.question_id}</span>
+                        </td>
+                        <td class="p-4 font-black ${scoreColor}"><span class="px-3 py-1.5 ${scoreBg} rounded-lg border shadow-sm">${run.score} / 100</span></td>
+                        <td class="p-4 text-xs text-slate-500">${time}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="openArtifact('${run.submission_id}')" class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border border-indigo-100 text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm"><i class="fa-solid fa-microscope mr-2"></i>Inspect</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function fetchAlerts() {
+            const tbody = document.getElementById('alerts-table-body');
+            const res = await fetch('/api/admin/malpractice_logs');
+            allAlerts = await res.json();
+            
+            tbody.innerHTML = '';
+            if(allAlerts.length === 0) return tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-500">No security alerts found.</td></tr>';
+
+            allAlerts.forEach(a => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-red-100/50 transition-colors">
+                        <td class="p-4 text-xs text-slate-600">${new Date(a.timestamp).toLocaleString()}</td>
+                        <td class="p-4 font-bold text-slate-800"><i class="fa-solid fa-user-ninja mr-2 text-red-400"></i>${a.student_name || 'Unknown'}</td>
+                        <td class="p-4 font-mono text-xs text-slate-500">${a.question_id}</td>
+                        <td class="p-4 text-xs font-bold text-red-600 uppercase tracking-wider">${a.violation_type.replace('_', ' ')}</td>
+                        <td class="p-4 font-black text-red-700 bg-red-50/50 rounded-r-lg">${a.strike_count} / 3</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function switchTab(tab) {
+            ['evals', 'alerts', 'trainers'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden-pane');
+                document.getElementById(`btn-tab-${t}`).className = "px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 rounded-lg whitespace-nowrap transition-all";
+            });
+            
+            document.getElementById(`view-${tab}`).classList.remove('hidden-pane');
+            
+            const btnStyles = {
+                'evals': "px-4 py-2 text-sm font-bold bg-white text-blue-600 rounded-lg shadow-sm whitespace-nowrap transition-all",
+                'trainers': "px-4 py-2 text-sm font-bold bg-white text-purple-600 rounded-lg shadow-sm whitespace-nowrap transition-all",
+                'alerts': "px-4 py-2 text-sm font-bold bg-white text-red-600 rounded-lg shadow-sm whitespace-nowrap transition-all"
+            };
+            document.getElementById(`btn-tab-${tab}`).className = btnStyles[tab];
+        }
+
+        function filterTable() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allRuns.filter(r => r.submission_id.toLowerCase().includes(query) || (r.student_name && r.student_name.toLowerCase().includes(query)) || r.question_id.toLowerCase().includes(query));
+            renderEvalTable(filtered);
+        }
+
+        function exportCSV() {
+            let csv = "Sub ID,Student Name,Task ID,Score,Timestamp\n";
+            allRuns.forEach(r => {
+                csv += `${r.submission_id},"${r.student_name || 'N/A'}",${r.question_id},${r.score},"${new Date(r.timestamp).toLocaleString()}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'prism_evaluations.csv';
+            a.click();
+        }
+
+        // --- ARTIFACT INSPECTOR ---
+        function openArtifact(subId) {
+            const run = allRuns.find(r => r.submission_id === subId);
+            if(!run) return;
+
+            document.getElementById('modal-sub-id').innerText = `Sub ID: ${run.submission_id} | Task: ${run.question_id}`;
+            document.getElementById('modal-score').innerText = `${run.score}/100`;
+            
+            document.getElementById('modal-code-html').value = run.submitted_code.html || 'No HTML';
+            document.getElementById('modal-code-css').value = run.submitted_code.css || 'No CSS';
+            document.getElementById('modal-code-js').value = run.submitted_code.js || 'No JS';
+            document.getElementById('modal-code-json').value = JSON.stringify(run.breakdown_json, null, 2);
+            switchCodeTab('html');
+
+            const cb = `?t=${new Date().getTime()}`;
+            document.getElementById('modal-img-expected').src = run.image_paths.expected + cb;
+            document.getElementById('modal-img-actual').src = run.image_paths.actual + cb;
+
+            const aiContainer = document.getElementById('modal-ai-content');
+            const ai = run.breakdown_json?.aiFeedback;
+            if(ai && (ai.correct_elements?.length > 0 || ai.incorrect_elements?.length > 0)) {
+                aiContainer.innerHTML = `
+                    <div class="text-sm bg-emerald-50 p-4 rounded-xl border border-emerald-100"><strong class="text-emerald-700 block mb-1 uppercase tracking-wider text-[10px]">Got Right</strong> <span class="text-emerald-900">${ai.correct_elements.join(', ')}</span></div>
+                    <div class="text-sm bg-red-50 p-4 rounded-xl border border-red-100"><strong class="text-red-700 block mb-1 uppercase tracking-wider text-[10px]">Visual Mistakes</strong> <span class="text-red-900">${ai.incorrect_elements.join(', ')}</span></div>
+                    <div class="text-sm bg-indigo-50 p-4 rounded-xl border border-indigo-100"><strong class="text-indigo-700 block mb-1 uppercase tracking-wider text-[10px]">AI Suggestion</strong> <span class="text-indigo-900">${ai.improvement_suggestions.join(', ')}</span></div>
+                `;
+            } else {
+                aiContainer.innerHTML = `<p class="text-sm text-slate-500 italic text-center py-6">AI analysis not generated for this match.</p>`;
+            }
+
+            document.getElementById('artifact-modal').classList.remove('hidden');
+        }
+
+        function switchCodeTab(lang) {
+            ['html', 'css', 'js', 'json'].forEach(l => {
+                document.getElementById(`modal-code-${l}`).classList.add('hidden-pane');
+                document.getElementById(`modal-tab-${l}`).className = "px-5 py-3 text-xs font-mono text-slate-400 hover:text-white border-t-2 border-transparent transition-colors";
+            });
+            document.getElementById(`modal-code-${lang}`).classList.remove('hidden-pane');
+            document.getElementById(`modal-tab-${lang}`).className = "px-5 py-3 text-xs font-mono text-white bg-[#1e1e1e] border-t-2 border-blue-500 transition-colors";
+        }
+
+        function closeModal() { document.getElementById('artifact-modal').classList.add('hidden'); }
+
+        window.onload = fetchAllData;
+    </script>
+</body>
+</html>
